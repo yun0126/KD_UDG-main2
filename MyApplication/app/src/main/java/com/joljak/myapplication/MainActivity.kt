@@ -64,9 +64,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 val latLng = LatLng(location.latitude, location.longitude)
 
                 locationHistory.add(latLng)
-                currentMarker?.remove()
-
-                currentMarker = mMap.addMarker(MarkerOptions().position(latLng))        //Current Position글자 삭제
 
                 val polylineOptions = PolylineOptions()
                 polylineOptions.color(Color.YELLOW)
@@ -116,6 +113,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             if (!isPaused) {
 //                stopTracking()
                 stopOn()
+
                 Log.d("stopOnClick", "isPaused: ${isPaused}") // 정지상태 출력
                 Log.d("stopOnClick", "isTracking: ${isTracking}") // 트래킹상태 출력
 
@@ -200,7 +198,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                         CameraPosition.builder()
                             .target(mMap.cameraPosition.target)
                             .zoom(mMap.cameraPosition.zoom)
-                            .bearing(-azimuth)
+                            .bearing(azimuth)
                             .build()
                     )
                 )
@@ -234,7 +232,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 saveLocationHistoryAsGpxFile(fileName)
                 isTracking = false
                 mMap.clear()
-                pauseLocationUpdates()
+                finLocationUpdates()
                 updateButton()
             } else {
                 Toast.makeText(this, "파일 이름을 입력하세요.", Toast.LENGTH_SHORT).show()
@@ -459,27 +457,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(polylineOptions.points[0], 15f))
     }
 
-    private var currentMarker: Marker? = null       //그려져 있는 마커
-
-    private fun updateCurrentLocation(location: Location) {
-        val latLng = LatLng(location.latitude, location.longitude)
-
-        // 이전 마커 삭제
-        currentMarker?.remove()
-
-        // 현재 위치 마커 추가
-        currentMarker = mMap.addMarker(
-            MarkerOptions()
-                .position(latLng)
-        )
-
-        // 지도 중심 이동
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14f))
-    }
 
 
     private fun startTracking() {
-        Log.d("트래킹 시작", "트래킹시작")
+        Log.d("startTracking", "트래킹시작")
         isTracking = true
         updateButton()
         startLocationUpdates()
@@ -497,23 +478,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         Log.d("트래킹중지버튼", "트래킹중지버튼")
 //        isTracking = false
 //        updateButton()
-//        pauseLocationUpdates()
+//        finLocationUpdates()
 
 
     }
 
     private fun stopOn() {
-        isPaused = true
-        updateStopButton()
-//        startLocationUpdates()
-        Log.d("stopOn", "stopOn") // updateButton 정보를 로그로 출력
+        if (isTracking) {
 
+            isPaused = true
+            updateStopButton()
+//        startLocationUpdates()
+            pauseTracking()
+            Log.d("stopOn", "stopOn") // updateButton 정보를 로그로 출력
+
+        }
     }
 
     private fun stopOff() {
         isPaused = false
         updateStopButton()
-//        pauseLocationUpdates()
+        resumeTracking()
+
         Log.d("stopOff", "stopOff") // updateButton 정보를 로그로 출력
 
     }
@@ -628,11 +614,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-    private fun pauseLocationUpdates() {
+    private fun finLocationUpdates() {
         val locationManager = ContextCompat.getSystemService(this, LocationManager::class.java)
         locationManager?.removeUpdates(locationListener)
+
+        locationHistory.clear()
         Toast.makeText(this, "위치 업데이트를 정지합니다.", Toast.LENGTH_SHORT).show()
     }
+//    fun onPauseClick() {
+//        if (!isTracking) {
+//            return
+//        }
+//
+//        if (isPaused) {
+//            resumeTracking()
+//        } else {
+//            pauseTracking()
+//        }
+//    }
 
     override fun onResume() {
         super.onResume()
@@ -647,30 +646,27 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun pauseTracking() {               // 위치 업데이트를 중지합니다.
 
-        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        locationManager.removeUpdates(locationListener)
+        Log.d("pauseTracking", "stopOn") // updateButton 정보를 로그로 출력
+        if (isTracking) {
+            isTracking = false
+            Toast.makeText(this, "pauseTracking", Toast.LENGTH_SHORT).show()
+        }
 
         // 일시정지 상태를 나타내는 변수를 설정합니다.
         isPaused = true
-
+        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        locationManager.removeUpdates(locationListener)
     }
 
-    fun onPauseClick(view: View) {
-        if (!isTracking) {
-            return
-        }
-
-        if (isPaused) {
-            resumeTracking()
-        } else {
-            pauseTracking()
-        }
-    }
 
     private fun resumeTracking() {
-        startLocationUpdates()
-        isPaused = false
-        Toast.makeText(this, "추적이 재개되었습니다.", Toast.LENGTH_SHORT).show()
+        if (!isTracking) {
+
+            startLocationUpdates()
+            startTracking()
+            isPaused = false
+            Toast.makeText(this, "추적이 재개되었습니다.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {                    // 재시작해도 현재 상태 유지.
